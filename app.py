@@ -1,13 +1,17 @@
+# app.py
+
 import streamlit as st
 import tempfile
 import os
 from video_to_audio import extract_audio
-from speech_to_text import audio_to_text
+from speech_to_text import audio_to_text_with_timestamps
 from azure_openai_integration import Azure_openai_service
-from text_to_speech import text_to_speech
+from text_to_speech import text_to_speech_segment
+from synchronize_audio import synchronize_speech_segments
 from replace_audio import replace_audio
+from pydub import AudioSegment
 
-st.title("AI-Powered Video Audio Replacement")
+st.title("AI-Powered Video Audio Replacement with Synchronization")
 
 uploaded_file = st.sidebar.file_uploader("Upload a Video File", type=["mp4", "mov", "avi", "mkv"])
 
@@ -31,21 +35,25 @@ if uploaded_file is not None:
         st.sidebar.write(f"Audio file size: {audio_size / (1024 * 1024):.2f} MB")
 
         with st.spinner("Transcribing audio... This may take a while for large files."):
-            # Transcribe the extracted audio
-            transcript = audio_to_text(audio_path)
+            # Transcribe the extracted audio with timestamps
+            transcript, words_info = audio_to_text_with_timestamps(audio_path)
             st.sidebar.text_area("Original Transcription", transcript, height=300)
 
         with st.spinner("Correcting Transcription... This may take a while for large files."):
             # Use Azure services to correct the grammar and remove filler words
-            corrected_transcript = Azure_openai_service(transcript)
+            corrected_transcript, corrected_words_info = Azure_openai_service(transcript, words_info)
             st.sidebar.text_area("Corrected Transcription", corrected_transcript, height=300)
 
-        with st.spinner("Generating Audio... This may take a while for large files."):
-            # Generate the voice of corrected text
-            generated_voice_path = text_to_speech(corrected_transcript)
-            
+        with st.spinner("Generating and Synchronizing Audio... This may take a while for large files."):
+            # Generate synchronized speech audio
+            synchronized_audio_path = synchronize_speech_segments(
+                corrected_words_info,
+                corrected_transcript,
+                text_to_speech_segment
+            )
+
             # Determine audio format for display
-            _, gen_ext = os.path.splitext(generated_voice_path)
+            _, gen_ext = os.path.splitext(synchronized_audio_path)
             gen_ext = gen_ext.lower()
             if gen_ext == '.wav':
                 audio_format = 'audio/wav'
@@ -54,18 +62,14 @@ if uploaded_file is not None:
             else:
                 audio_format = 'audio/mpeg'  # Default fallback
 
-            # Read the binary content of the generated audio file
-            with open(generated_voice_path, "rb") as audio_file:
-                audio_bytes = audio_file.read()
-            
-            # Display the generated audio in the sidebar
-            st.sidebar.audio(audio_bytes, format=audio_format)
+            # Display the synchronized audio in the sidebar
+            st.sidebar.audio(synchronized_audio_path, format=audio_format)
 
         with st.spinner("Replacing audio in video..."):
             try:
                 st.write(f"Video Path: {video_path}")
-                st.write(f"Generated Voice Path: {generated_voice_path}")
-                final_video_path = replace_audio(video_path, generated_voice_path)
+                st.write(f"Synchronized Audio Path: {synchronized_audio_path}")
+                final_video_path = replace_audio(video_path, synchronized_audio_path)
                 st.write(f"Final Video Path: {final_video_path}")
             except Exception as e:
                 st.error(f"Error during audio replacement: {e}")
@@ -88,7 +92,7 @@ if uploaded_file is not None:
             try:
                 os.remove(video_path)
                 os.remove(audio_path)
-                os.remove(generated_voice_path)
+                os.remove(synchronized_audio_path)
                 os.remove(final_video_path)
             except Exception as cleanup_error:
                 st.warning(f"Could not delete temporary files: {cleanup_error}")

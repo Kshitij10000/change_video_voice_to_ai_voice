@@ -1,14 +1,16 @@
+# text_to_speech.py
+
 from google.cloud import texttospeech
 import os
 import tempfile
 
 # Ensure the path to your Google Cloud service account key is correct
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'text_audio_api.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'text_audio_api.json' # give jason path to your own api json file 
 
 client = texttospeech.TextToSpeechClient()
 
-def text_to_speech(text_block):
-    synthesis_input = texttospeech.SynthesisInput(text=text_block)
+def text_to_speech_segment(text_segment):
+    synthesis_input = texttospeech.SynthesisInput(text=text_segment)
 
     voice = texttospeech.VoiceSelectionParams(
         language_code="en-US",
@@ -17,8 +19,7 @@ def text_to_speech(text_block):
 
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3,
-        effects_profile_id=['small-bluetooth-speaker-class-device']
-        # Removed speaking_rate and pitch as per previous error
+        # Optionally, adjust speaking rate and pitch if needed
     )
 
     response = client.synthesize_speech(
@@ -27,10 +28,10 @@ def text_to_speech(text_block):
         audio_config=audio_config
     )
 
-    # Create a temporary file to store the generated audio
+    # Create a temporary file to store the generated audio segment
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
         tmp_audio.write(response.audio_content)
         tmp_audio_path = tmp_audio.name
-        print(f'Audio content written to "{tmp_audio_path}"')
+        print(f'Audio segment written to "{tmp_audio_path}"')
 
     return tmp_audio_path
