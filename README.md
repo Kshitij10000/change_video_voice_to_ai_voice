@@ -37,7 +37,7 @@ Azure OpenAI Service
 
 Clone the Repository
 
-git clone https://github.com/yourusername/ai-powered-video-audio-replacement.git
+git clone https://github.com/kshitij10000/ai-powered-video-audio-replacement.git
 cd ai-powered-video-audio-replacement
 
 Create a Virtual Environment
